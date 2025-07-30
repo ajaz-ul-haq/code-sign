@@ -3,29 +3,37 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\TokenRequest;
-use App\Models\Client;
+use App\Models\User;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 
 class AuthController extends Controller
 {
 
     public function login(TokenRequest $request): JsonResponse
     {
-        $client = Client::where('LICENSE_CODE', $request->LICENSE_CODE)
-            ->where('APP_URL', $request->APP_URL)->firstOr(function () {
-                throw new HttpResponseException($this->errorResponse('License code not found', 404));
-            });
+        $attempt = Auth::attempt(['username' => 'faveobot', 'password' => $request->input('password')]);
 
-        $client->tokens()->delete();
+        if (!$attempt || !($authUser = Auth::user())) {
+            return $this->errorResponse('Invalid Username or Password');
+        }
+
+        $authUser->tokens()->delete();
 
         return $this->successResponse('', [
-            'token' => $client->createToken('code_sign_token', ['code-sign'])->plainTextToken,
+            'token' => $authUser->createToken('code_sign_token', ['code-sign'])->plainTextToken,
         ]);
     }
 
+    public function register(Request $request): JsonResponse
+    {
+        (new InstallationController())->handleInstall($request->input('username'), $response);
+
+         return $response['success'] ? response()->json($response) : $this->errorResponse($response['message']);
+    }
 
     public function logout(Request $request): JsonResponse
     {

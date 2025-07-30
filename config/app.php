@@ -122,4 +122,11 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
+    'code-sign' => [
+        'thumbprint' => env('CODE_SIGN_THUMBPRINT'),
+        'pfx-password' => env('PFX_PASSWORD'),
+        'signToolPath' => env('SIGN_TOOL_PATH', 'signtool'),
+        'innoPath' => env('INNO_COMPILER_PATH', 'ISCC')
+    ]
 ];
