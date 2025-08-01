@@ -62,19 +62,17 @@ class CodeSignController extends Controller
         ]);
 
         try {
-            $process->run();
+            $process->mustRun();
+
+            $this->executionElement->isSuccessFull($process->getOutput());
         } catch (ProcessFailedException $exception) {
             $this->executionElement->markAsFailed($exception->getMessage());
         }
 
-        !$process->isSuccessful() ?
-            $this->executionElement->markAsFailed($process->getErrorOutput()) :
-            $this->executionElement->isSuccessFull($process->getOutput());
-
         return $this;
     }
 
-    public function sendScriptToFaveo()
+    public function sendScriptToFaveo(): void
     {
         if ($this->executionElement->isAcknowledged()) {
             return;
@@ -105,7 +103,7 @@ class CodeSignController extends Controller
         return $this;
     }
 
-    private function codeSignViaSignTool()
+    private function codeSignViaSignTool(): void
     {
         $process = new Process([
             $this->codeSignConfig['signToolPath'],
@@ -120,15 +118,16 @@ class CodeSignController extends Controller
 
         try {
             $process->mustRun();
-        } catch (ProcessFailedException $e) {
-            $this->executionElement->markAsFailed($process->getErrorOutput());
-        }
 
-        $this->executionElement->isSuccessFull($process->getOutput());
-        $this->executionElement->finalize();
+            $this->executionElement->isSuccessFull($process->getOutput());
+            $this->executionElement->finalize();
+
+        } catch (ProcessFailedException $e) {
+            $this->executionElement->markAsFailed($e->getMessage());
+        }
     }
 
-    public function markAsDeployed()
+    public function markAsDeployed(): void
     {
         $requestData = $this->executionElement->payload;
 
@@ -140,11 +139,9 @@ class CodeSignController extends Controller
             'path' => $this->executionElement->path,
             'deployed' => 1
         ]);
-
-        $this->executionElement->finalize();
     }
 
-    private function createTemporaryIssFile(&$path)
+    private function createTemporaryIssFile(&$path): void
     {
         $this->oldPath = $this->executionElement->path;
 
@@ -158,7 +155,7 @@ class CodeSignController extends Controller
 
     }
 
-    private function replaceVariable(&$issFileContents)
+    private function replaceVariable(&$issFileContents): void
     {
         Storage::makeDirectory($pathToUse = 'code-signed-agents/'.Str::random());
 
@@ -181,15 +178,39 @@ class CodeSignController extends Controller
         $this->executionElement->path = 'storage/'.$outPutDir.DIRECTORY_SEPARATOR.$outPutFile.'.exe';
     }
 
-    private function deleteTemporaryIssFile($temporaryIssFile)
+    private function deleteTemporaryIssFile($temporaryIssFile): void
     {
         Storage::delete($temporaryIssFile);
     }
 
-    private function runInnoSetupToCompileAgent()
+    private function runInnoSetupToCompileAgent(): void
     {
-        if ($this->executionElement->status) {
-           return;
+        if (!$this->proceedForInnoCompilation()) {
+            return;
+        }
+
+        $this->createTemporaryIssFile($temporaryIssFile);
+
+        $process = new Process([
+            $this->codeSignConfig['innoPath'],
+            storage_path('app/private/'. $temporaryIssFile)
+        ]);
+
+        try {
+            $process->mustRun();
+
+            Storage::deleteDirectory(dirname($this->oldPath));
+        } catch (ProcessFailedException $e) {
+            $this->executionElement->markAsFailed($e->getMessage());
+        }
+
+        $this->deleteTemporaryIssFile($temporaryIssFile);
+    }
+
+    private function proceedForInnoCompilation(): bool
+    {
+        if ($this->isCodeSignedAlready()) {
+            return false;
         }
 
         if ($this->executionElement->payloadValue('platform') != 'windows') {
@@ -203,25 +224,9 @@ class CodeSignController extends Controller
             Storage::deleteDirectory(dirname($oldPath));
             $this->executionElement->update(['path' => 'storage/app/private/'.$pathToUse, 'status' => 1]);
             $this->executionElement = $this->executionElement->refresh();
-            return;
+            return false;
         }
 
-        $this->createTemporaryIssFile($temporaryIssFile);
-
-        $absolutePath = storage_path('app/private/'. $temporaryIssFile);
-
-        $process = new Process([$this->codeSignConfig['innoPath'], $absolutePath]);
-
-        try {
-            $process->mustRun();
-
-            Storage::deleteDirectory(dirname($this->oldPath));
-        } catch (ProcessFailedException $e) {
-            $this->executionElement->markAsFailed($process->getErrorOutput());
-        }
-
-        $this->deleteTemporaryIssFile($temporaryIssFile);
-
-        $this->executionElement->isSuccessFull($process->getOutput());
+        return true;
     }
 }
