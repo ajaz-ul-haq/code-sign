@@ -78,13 +78,13 @@ class CodeSignController extends Controller
             return;
         }
 
-        $response = Http::withBody(json_encode([
-            'status' => true, 'platform' =>  $this->executionElement->payloadValue('platform'),
-            'token' =>  $this->executionElement->payloadValue('authToken'),
-            'contents' => file_get_contents(storage_path( 'app/private/'.$this->executionElement->path))
-        ]))->post($this->executionElement->getWebhookUrl());
+        $response = Http::withoutVerifying()->withBody(json_encode([
+                'status' => true, 'platform' =>  $this->executionElement->payloadValue('platform'),
+                'token' =>  $this->executionElement->payloadValue('authToken'),
+                'contents' => file_get_contents(storage_path( 'app/private/'.$this->executionElement->path))
+            ]))->post($this->executionElement->getWebhookUrl());
 
-        if ($response->successful()) {
+        if ($response->status() === 204) {
             $this->executionElement->finalize();
         }
     }

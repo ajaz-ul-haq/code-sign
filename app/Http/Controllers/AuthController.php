@@ -15,7 +15,7 @@ class AuthController extends Controller
 
     public function login(TokenRequest $request): JsonResponse
     {
-        $attempt = Auth::attempt(['username' => 'faveobot', 'password' => $request->input('password')]);
+        $attempt = Auth::attempt($request->only(['username', 'password']));
 
         if (!$attempt || !($authUser = Auth::user())) {
             return $this->errorResponse('Invalid Username or Password');

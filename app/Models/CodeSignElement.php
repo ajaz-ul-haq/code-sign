@@ -41,7 +41,7 @@ class CodeSignElement extends Model
 
     public function getWebhookUrl(): string
     {
-        return $this->payloadValue('apiUrl').'/agent-software/code-signed/script';
+        return rtrim($this->payloadValue('apiUrl'), '/').'/v3/agent-software/webhook';
     }
 
     public function isForScript(): bool
