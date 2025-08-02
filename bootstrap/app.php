@@ -12,13 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->redirectGuestsTo('/auth/login');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, $request) {
-            return response()->json([
-                'status' => false,
-                'message' => $e->getMessage(),
-            ], method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500);
+            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                $response = [['status' => false, 'message' => $e->getMessage()], 401];
+            } else {
+                $response = [[
+                    'status' => false,
+                    'message' => $e->getMessage(),
+                ], method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500];
+            }
+
+            return response()->json( ...$response);
         });
     })->create();
